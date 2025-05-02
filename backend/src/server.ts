@@ -1,18 +1,112 @@
-import express from "express"
-import cors from "cors"
-import dotenv from "dotenv"
+import express, { Request, Response } from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { StreamChat } from "stream-chat";
+import axios from "axios"; // Import axios for sending requests
 
+dotenv.config();
 
-dotenv.config()
+const app = express();
 
-const app = express();  
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
-app.use(cors()); 
-app.use(express.json())
-app.use(express.urlencoded({extended: false}))
+// Initialize Stream Client
+if (!process.env.STREAM_API_KEY || !process.env.STREAM_API_SECRET) {
+  throw new Error("Missing Stream API credentials in environment variables.");
+}
+
+const chatClient = StreamChat.getInstance(
+  process.env.STREAM_API_KEY,
+  process.env.STREAM_API_SECRET
+);
+
+// Register user with stream chat
+app.post(
+  "/register-user",
+  async (req: Request, res: Response): Promise<any> => {
+    const { name, email } = req.body || {};
+
+    if (!name || !email) {
+      return res
+        .status(400)
+        .json({ error: "Please fill all the required fields" });
+    }
+
+    const userId = email.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+    try {
+      // Check if user exists
+      const userResponse = await chatClient.queryUsers({ id: { $eq: userId } });
+
+      if (!userResponse.users.length) {
+        // Add new user to the stream
+        await chatClient.upsertUser({
+          id: userId,
+          name: name,
+          email: email,
+          role: "user",
+        });
+      }
+
+      res.status(200).json({ userId, name, email });
+    } catch (error: any) {
+      console.error("Error when registering:", error.message);
+      return res.status(500).json({ error: "Internal Server Error" });
+    }
+  }
+);
+
+// Send Message to Gemini
+app.post("/chat", async (req: Request, res: Response): Promise<any> => {
+  const { message, userId } = req.body;
+
+  if (!message || !userId) {
+    return res.status(400).json({ error: "Message and user are required" });
+  }
+
+  try {
+    // Verifying the user exists
+    const userResponse = await chatClient.queryUsers({ id: userId });
+
+    if (!userResponse.users.length) {
+      return res
+        .status(404)
+        .json({ error: "User not found. Please register and try again." });
+    }
+
+    // Make the request to the Gemini API
+    const geminiResponse = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: message, // The message from the user
+              },
+            ],
+          },
+        ],
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    // Send the response from Gemini back to the user
+    res.status(200).json({ response: geminiResponse.data });
+  } catch (error: any) {
+    console.error("Error when sending message to Gemini:", error.message);
+    return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT,() => {
-    console.log(`Server is running at port: ${PORT}` );
-})
+app.listen(PORT, () => {
+  console.log(`Server is running at port: ${PORT}`);
+});
