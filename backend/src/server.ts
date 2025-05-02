@@ -3,6 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { StreamChat } from "stream-chat";
 import axios from "axios"; // Import axios for sending requests
+import { db } from "./config/database.js";
+import { chats, users } from "./db/schema.js";
+import { eq } from "drizzle-orm";
 
 dotenv.config();
 
@@ -50,6 +53,19 @@ app.post(
         });
       }
 
+      // check for existing users in the database
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.userId, userId));
+
+      if (!existingUser.length) {
+        console.log(
+          `User ${userId} does not exists in the db! ADDING THEM NOW...`
+        );
+        await db.insert(users).values({ userId, name, email });
+      }
+
       res.status(200).json({ userId, name, email });
     } catch (error: any) {
       console.error("Error when registering:", error.message);
@@ -76,6 +92,19 @@ app.post("/chat", async (req: Request, res: Response): Promise<any> => {
         .json({ error: "User not found. Please register and try again." });
     }
 
+    // Check user in database
+
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.userId, userId));
+
+    if (!existingUser) {
+      return res
+        .status(404)
+        .json({ error: "User not found please register and try again" });
+    }
+
     // Make the request to the Gemini API
     const geminiResponse = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
@@ -97,11 +126,61 @@ app.post("/chat", async (req: Request, res: Response): Promise<any> => {
       }
     );
 
+    // Extract just the text from the Gemini response to avoid circular references
+    let aiReplyText = "No response generated";
+
+    if (
+      geminiResponse.data &&
+      geminiResponse.data.candidates &&
+      geminiResponse.data.candidates[0] &&
+      geminiResponse.data.candidates[0].content &&
+      geminiResponse.data.candidates[0].content.parts &&
+      geminiResponse.data.candidates[0].content.parts[0] &&
+      geminiResponse.data.candidates[0].content.parts[0].text
+    ) {
+      aiReplyText = geminiResponse.data.candidates[0].content.parts[0].text;
+    }
+
+    // save the chat to db
+
+    await db.insert(chats).values({ userId, message, reply: aiReplyText });
+
+    // Create or get the channel
+    const channel = chatClient.channel("messaging", `chat-${userId}`, {
+      name: "AI CHAT",
+      created_by_id: "ai_bot",
+    });
+
+    await channel.create();
+    await channel.sendMessage({ text: message, user_id: "ai_bot" });
+
     // Send the response from Gemini back to the user
-    res.status(200).json({ response: geminiResponse.data });
+    res.status(200).json({ reply: aiReplyText });
   } catch (error: any) {
     console.error("Error when sending message to Gemini:", error.message);
     return res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// GET chat history for a user
+
+app.post("/get-messages", async (req: Request, res: Response): Promise<any> => {
+  const { userId } = req.body;
+
+  if (!userId) {
+    return res.status(400).json({ error: "User ID is required to continue" });
+  }
+
+  try {
+    const chatHistory = await db
+      .select()
+      .from(chats)
+      .where(eq(chats.userId, userId));
+      
+    res.status(200).json({ messages: chatHistory });
+  } catch (error: any) {
+    console.log("Error fetching chat history", error.message);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
