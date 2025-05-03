@@ -1,5 +1,9 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import Header from '../components/Header.vue';
+</script>
 
 <template>
-    <h1>AI CHAT PAGE</h1>
+    <div class="flex flex-col h-screen bg-gray-900 text-white">
+        <Header/>
+    </div>
 </template>
