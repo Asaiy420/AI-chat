@@ -74,6 +74,19 @@ app.post(
   }
 );
 
+// Function to clean up AI response
+const cleanResponse = (text: string): string => {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, "$1") // Remove ** for bold text
+    .replace(/\*(.*?)\*/g, "$1") // Remove * for italic text
+    .replace(/`(.*?)`/g, "$1") // Remove ` for code
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1") // Remove markdown links
+    .replace(/#{1,6}\s/g, "") // Remove markdown headers
+    .replace(/>\s/g, "") // Remove blockquotes
+    .replace(/---/g, "") // Remove horizontal rules
+    .trim(); // Remove extra whitespace
+};
+
 // Send Message to Gemini
 app.post("/chat", async (req: Request, res: Response): Promise<any> => {
   const { message, userId } = req.body;
