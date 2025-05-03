@@ -105,17 +105,35 @@ app.post("/chat", async (req: Request, res: Response): Promise<any> => {
         .json({ error: "User not found please register and try again" });
     }
 
+    //fetch users past messages for context
+
+    const chatHistory = await db
+      .select()
+      .from(chats)
+      .where(eq(chats.userId, userId))
+      .orderBy(chats.createdAt)
+      .limit(10);
+
+    // format the chat history for gemini ai
+    const conversation = chatHistory
+      .map((chat) => ({
+        role: "user",
+        parts: [{ text: chat.message }],
+      }))
+      .concat({
+        role: "model",
+        parts: [{ text: chatHistory[chatHistory.length - 1]?.reply || "" }],
+      });
+
     // Make the request to the Gemini API
     const geminiResponse = await axios.post(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         contents: [
+          ...conversation,
           {
-            parts: [
-              {
-                text: message, // The message from the user
-              },
-            ],
+            role: "user",
+            parts: [{ text: message }],
           },
         ],
       },
