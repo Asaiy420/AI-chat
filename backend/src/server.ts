@@ -99,7 +99,7 @@ app.post("/chat", async (req: Request, res: Response): Promise<any> => {
       .from(users)
       .where(eq(users.userId, userId));
 
-    if (!existingUser) {
+    if (!existingUser.length) {
       return res
         .status(404)
         .json({ error: "User not found please register and try again" });
@@ -176,7 +176,7 @@ app.post("/get-messages", async (req: Request, res: Response): Promise<any> => {
       .select()
       .from(chats)
       .where(eq(chats.userId, userId));
-      
+
     res.status(200).json({ messages: chatHistory });
   } catch (error: any) {
     console.log("Error fetching chat history", error.message);

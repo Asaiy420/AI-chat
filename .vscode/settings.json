@@ -1,0 +1,22 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "volar.takeOverMode.enabled": true,
+  "volar.completion.preferredTagNameCase": "pascal",
+  "volar.completion.preferredAttrNameCase": "kebab",
+  "volar.icon.preview": true,
+  "errorLens.enabled": true,
+  "errorLens.enabledDiagnosticLevels": ["error", "warning", "info"],
+  "errorLens.messageEnabled": true,
+  "errorLens.messageMaxChars": 1000,
+  "errorLens.statusBarIconErrorForeground": "#ff0000",
+  "errorLens.statusBarIconWarningForeground": "#ffa500",
+  "errorLens.messageBackground": "#1e1e1e",
+  "errorLens.messageForeground": "#ffffff",
+  "errorLens.messageBorder": "#ff0000",
+  "errorLens.messagePadding": "4px",
+  "errorLens.messageFontFamily": "Consolas, 'Courier New', monospace",
+  "errorLens.messageFontSize": "12px",
+  "errorLens.messageLineHeight": "1.4",
+  "errorLens.messageMaxLineCount": 10,
+  "errorLens.messageDelay": 0
+}
